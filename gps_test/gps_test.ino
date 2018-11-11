@@ -15,5 +15,5 @@ void loop()
   {
     Serial.write(gps.read());
   }
-
+delay(300);
 }
