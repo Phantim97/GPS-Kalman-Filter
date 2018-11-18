@@ -2,7 +2,7 @@
 #include <vector>
 #include <thread>
 #include <Windows.h>
-#include <immintrin.h>
+#include <xmmintrin.h>
 
 void exitState()
 {
