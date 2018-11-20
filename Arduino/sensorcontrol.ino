@@ -32,15 +32,7 @@ void setup()
 
   int setFullScaleAccelRange(MPU6050_ACCEL_FS_2);
 }
-
-void loop()
-{
-  printGPSInfo();
-  printMPUData();
-  smartDelay(1000); 
-}
-
-void printGPSInfo()
+oid printGPSInfo()
 {
   // Print latitude, longitude, altitude in feet, course, speed, date, time,
   // and the number of visible satellites.
@@ -96,4 +88,11 @@ void printMPUData(){
   Serial.print(" | GyY = "); Serial.print(GyY/ 131.0);
   Serial.print(" | GyZ = "); Serial.println(GyZ/ 131.0);
       blinkState = !blinkState;
+}
+
+void loop()
+{
+  printGPSInfo();
+  printMPUData();
+  smartDelay(1000); 
 }
