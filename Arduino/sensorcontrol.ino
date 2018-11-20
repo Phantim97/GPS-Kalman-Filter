@@ -32,7 +32,8 @@ void setup()
 
   int setFullScaleAccelRange(MPU6050_ACCEL_FS_2);
 }
-oid printGPSInfo()
+
+void printGPSInfo()
 {
   // Print latitude, longitude, altitude in feet, course, speed, date, time,
   // and the number of visible satellites.
