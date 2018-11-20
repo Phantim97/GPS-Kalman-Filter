@@ -1,6 +1,6 @@
 #include<Wire.h>
 #include <SoftwareSerial.h>
-#include"TinyGPS++.h"
+#include<TinyGPS++.h>
 
 TinyGPSPlus tinyGPS; // derives GPS data from module
 
@@ -37,14 +37,13 @@ void printGPSInfo()
 {
   // Print latitude, longitude, altitude in feet, course, speed, date, time,
   // and the number of visible satellites.
-  Serial.print("Lat: "); Serial.println(tinyGPS.location.lat(), 6);
-  Serial.print("Long: "); Serial.println(tinyGPS.location.lng(), 6);
-  Serial.print("Alt: "); Serial.println(tinyGPS.altitude.feet());
-  Serial.print("Course: "); Serial.println(tinyGPS.course.deg());
-  Serial.print("Speed: "); Serial.println(tinyGPS.speed.mph());
-  Serial.print("Time: "); printTime();
-  Serial.print("Sats: "); Serial.println(tinyGPS.satellites.value());
-  Serial.println();
+  Serial.print(tinyGPS.location.lat(), 6);
+  Serial.print(" "); Serial.print(tinyGPS.location.lng(), 6);
+  Serial.print(" "); Serial.print(tinyGPS.altitude.feet());
+  Serial.print(" "); Serial.print(tinyGPS.course.deg());
+  Serial.print(" "); Serial.print(tinyGPS.speed.mph());
+  Serial.print(" "); printTime();
+  Serial.print(" "); Serial.print(tinyGPS.satellites.value());
 }
 
 static void smartDelay(unsigned long ms)
@@ -66,7 +65,7 @@ void printTime()
   Serial.print(tinyGPS.time.minute());
   Serial.print(":");
   if (tinyGPS.time.second() < 10) Serial.print('0');
-  Serial.println(tinyGPS.time.second());
+  Serial.print(tinyGPS.time.second());
 }
 
 void printMPUData(){
@@ -81,14 +80,15 @@ void printMPUData(){
   GyX=Wire.read()<<8|Wire.read();  // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
   GyY=Wire.read()<<8|Wire.read();  // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
   GyZ=Wire.read()<<8|Wire.read();  // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
-  Serial.print("AcX = "); Serial.print(AcX/16384.0);
-  Serial.print(" | AcY = "); Serial.print(AcY/16384.0);
-  Serial.print(" | AcZ = "); Serial.print(AcZ/16384.0);
-  Serial.print(" | Tmp = "); Serial.print(Tmp/340.00+36.53);  //equation for temperature in degrees C from datasheet
-  Serial.print(" | GyX = "); Serial.print(GyX/ 131.0);
-  Serial.print(" | GyY = "); Serial.print(GyY/ 131.0);
-  Serial.print(" | GyZ = "); Serial.println(GyZ/ 131.0);
-      blinkState = !blinkState;
+  Serial.print(" "); Serial.print(AcX/16384.0);
+  Serial.print(" "); Serial.print(AcY/16384.0);
+  Serial.print(" "); Serial.print(AcZ/16384.0);
+  //Serial.print(" "); Serial.print(Tmp/340.00+36.53);  //equation for temperature in degrees C from datasheet
+  Serial.print(" "); Serial.print(GyX/ 131.0);
+  Serial.print(" "); Serial.print(GyY/ 131.0);
+  Serial.print(" "); Serial.print(GyZ/ 131.0);
+  blinkState = !blinkState;
+  Serial.println();
 }
 
 void loop()
