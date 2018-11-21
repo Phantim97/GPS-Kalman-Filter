@@ -1,39 +1,43 @@
 #include <iostream>
 #include <vector>
 #include <thread>
-#include <Windows.h>
+#include "ArduinoSerial.h"
 #include <xmmintrin.h>
 
-void exitState()
+void exitState(Serial &A)
 {
 	while (1)
 	{
 		if (GetAsyncKeyState(VK_ESCAPE))
 		{
+			A.~Serial();
 			exit(1);
 		}
 	}
+}
 
+void sensorData(Serial &A)
+{
+
+	if (A.IsConnected())
+		std::cout << "Connection Established\n";
+
+	char incomingData[256] = "";
+	int dataLength = 255;
+	int readResult = 0;
+
+	while (A.IsConnected())
+	{
+		readResult = A.ReadData(incomingData, dataLength);
+		incomingData[readResult] = 0;
+		std::cout << incomingData;
+		Sleep(500);
+	}
 }
 
 void processingData()
 {
-	// Sample loop to display exit functionality
-	int i = 0;
-	while (1)
-	{
-		if (i == INT_MAX - 1)
-		{
-			exit(0);
-		}
-		std::cout << i << " " << i << " " << i << " " << i << " " << i << " " << i << " " << i << '\n';
-		i++;
-	}
-}
-
-void sensorData()
-{
-	// Retrieve Sensor Data from Arduino
+	//Apply Filter to data
 }
 
 void matlabPlot()
@@ -41,17 +45,19 @@ void matlabPlot()
 	// Render Matlab Graphs
 }
 
-int main()
+int main() //Primary Driver
 {
-	std::thread keyboardListen(exitState);
-	std::thread sensorDataGet(sensorData);
-	std::thread processingThread(processingData);
-	std::thread matlabDisplay(matlabPlot);
+	Serial *Arduino = new Serial("COM3");
+
+	std::thread keyboardListen(exitState, std::ref(*Arduino)); // Passed Serial to destruct connection on exit
+	std::thread sensorDataGet(sensorData, std::ref(*Arduino));
+	//std::thread processingThread(processingData);
+	//std::thread matlabDisplay(matlabPlot);
 
 	keyboardListen.join();
 	sensorDataGet.join();
-	processingThread.join();
-	matlabDisplay.join();
+	//processingThread.join();
+	//matlabDisplay.join();
 
 	return 0;
 }
