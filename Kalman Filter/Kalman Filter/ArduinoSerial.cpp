@@ -1,4 +1,5 @@
 #include "ArduinoSerial.h"
+#include <iostream>
 
 Serial::Serial(const char *portName)
 {
@@ -104,6 +105,19 @@ int Serial::ReadData(char *buffer, unsigned int nbChar)
 	//If nothing has been read, or that an error was detected return 0
 	return 0;
 
+}
+
+int Serial::ReadDataTest(char *buffer, unsigned int nbChar)
+{
+	DWORD bytesRead;
+	unsigned int toRead;
+
+	ClearCommError(this->hSerial, &this->errors, &this->status); // derive status on board
+
+	if (this->status.cbInQue > 0)
+	{
+
+	}
 }
 
 bool Serial::IsConnected()
