@@ -1,12 +1,23 @@
-#include<Wire.h>
+#include <Wire.h>
 #include <SoftwareSerial.h>
-#include<TinyGPS++.h>
+#include <TinyGPS++.h>
+#include <util/crc16.h>
+
+union
+{
+  float f;
+  byte fbytes[4];
+} u;
+
+float sensorData[12];
+byte sensorByteData[394];
 
 TinyGPSPlus tinyGPS; // derives GPS data from module
 
 #define GPS_TX 3
 #define GPS_RX 4
 #define GPS_BAUD 9600
+#define MS 1000
 
 const int MPU_addr=0x68;  // I2C address of the MPU-6050
 int16_t AcX,AcY,AcZ,Tmp,GyX,GyY,GyZ;
@@ -33,17 +44,16 @@ void setup()
   int setFullScaleAccelRange(MPU6050_ACCEL_FS_2);
 }
 
-void printGPSInfo()
+void calcGPSInfo()
 {
   // Print latitude, longitude, altitude in feet, course, speed, date, time,
   // and the number of visible satellites.
-  Serial.print(tinyGPS.location.lat(), 6);
-  Serial.print(" "); Serial.print(tinyGPS.location.lng(), 6);
-  Serial.print(" "); Serial.print(tinyGPS.altitude.feet());
-  Serial.print(" "); Serial.print(tinyGPS.course.deg());
-  Serial.print(" "); Serial.print(tinyGPS.speed.mph());
-  Serial.print(" "); printTime();
-  Serial.print(" "); Serial.print(tinyGPS.satellites.value());
+  sensorData[0] = (tinyGPS.location.lat()/1.0);
+  sensorData[1] = (tinyGPS.location.lng()/1.0);
+  sensorData[2] = tinyGPS.altitude.feet();
+  sensorData[3] = tinyGPS.course.deg();
+  sensorData[4] = tinyGPS.speed.mph();
+  sensorData[5] = (tinyGPS.satellites.value()/1.0);
 }
 
 static void smartDelay(unsigned long ms)
@@ -51,49 +61,62 @@ static void smartDelay(unsigned long ms)
   unsigned long start = millis();
   do
   {
+    incMPUData();
     // If data has come in from the GPS module
     while (myGPS.available())
       tinyGPS.encode(myGPS.read()); // Send it to the encode function
   } while (millis() - start < ms);
 }
-
-void printTime()
-{
-  Serial.print(tinyGPS.time.hour());
-  Serial.print(":");
-  if (tinyGPS.time.minute() < 10) Serial.print('0');
-  Serial.print(tinyGPS.time.minute());
-  Serial.print(":");
-  if (tinyGPS.time.second() < 10) Serial.print('0');
-  Serial.print(tinyGPS.time.second());
-}
-
-void printMPUData(){
+void incMPUData(){
   Wire.beginTransmission(MPU_addr);
   Wire.write(0x3B);  // starting with register 0x3B (ACCEL_XOUT_H)
   Wire.endTransmission(false);
   Wire.requestFrom(MPU_addr,14,true);  // request a total of 14 registers
-  AcX=Wire.read()<<8|Wire.read();  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)    
-  AcY=Wire.read()<<8|Wire.read();  // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
-  AcZ=Wire.read()<<8|Wire.read();  // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
+  sensorData[6]+=Wire.read()<<8|Wire.read();  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)    
+  sensorData[7]+=Wire.read()<<8|Wire.read();  // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
+  sensorData[8]+=Wire.read()<<8|Wire.read();  // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
   Tmp=Wire.read()<<8|Wire.read();  // 0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
-  GyX=Wire.read()<<8|Wire.read();  // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
-  GyY=Wire.read()<<8|Wire.read();  // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
-  GyZ=Wire.read()<<8|Wire.read();  // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
-  Serial.print(" "); Serial.print(AcX/16384.0);
-  Serial.print(" "); Serial.print(AcY/16384.0);
-  Serial.print(" "); Serial.print(AcZ/16384.0);
+  sensorData[9]+=Wire.read()<<8|Wire.read();  // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
+  sensorData[10]+=Wire.read()<<8|Wire.read();  // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
+  sensorData[11]+=Wire.read()<<8|Wire.read();  // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
+
+}
+void calcMPUData(unsigned long ms){
+  sensorData[6] = (sensorData[6]/16384.0)/MS;
+  sensorData[7] = (sensorData[7]/16384.0)/MS;
+  sensorData[8] = (sensorData[8]/16384.0)/MS;
   //Serial.print(" "); Serial.print(Tmp/340.00+36.53);  //equation for temperature in degrees C from datasheet
-  Serial.print(" "); Serial.print(GyX/ 131.0);
-  Serial.print(" "); Serial.print(GyY/ 131.0);
-  Serial.print(" "); Serial.print(GyZ/ 131.0);
+  sensorData[9] = (sensorData[9]/131.0)/MS;
+  sensorData[10] = (sensorData[10]/131.0)/MS;
+  sensorData[11] = (sensorData[11]/131.0)/MS;
   blinkState = !blinkState;
-  Serial.println();
+}
+
+void dataSend()
+{
+  Serial.write(0x90);
+  delay(10);
+  for (int i = 0; i < 12; i++)
+  {
+    u.f = sensorData[i];
+    for (byte j = 0; j < 4; j++)
+    {
+      Serial.write(u.fbytes[j]);
+      //delay(10);
+    }
+    sensorData[i] = 0;
+  }
+  Serial.write(0x10);
+  delay(10);
 }
 
 void loop()
 {
-  printGPSInfo();
-  printMPUData();
-  smartDelay(1000); 
+  calcGPSInfo();
+  calcMPUData(MS);
+  dataSend();
+  //packetizedSend();
+  smartDelay(MS);
+  Serial.flush(); 
+  //delay(1000);
 }
