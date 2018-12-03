@@ -1,11 +1,10 @@
 #ifndef SERIALCLASS_H_INCLUDED
 #define SERIALCLASS_H_INCLUDED
 
-#define ARDUINO_WAIT_TIME 500
-
 #include <Windows.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "State.h"
 
 class Serial
 {
@@ -18,9 +17,10 @@ private:
 public:
 	Serial(const char *portName);
 	~Serial(); // close and clean up connection
-	int ReadData(char *buffer, unsigned int nbChar);
-	int ReadDataTest(char *buffer, unsigned int nbChar);
+	bool ReadData(State &k);
+	bool WriteData(unsigned char c);
 	bool IsConnected();
+	void ReadTest(State &K);
 };
 
 #endif // SERIALCLASS_H_INCLUDED
