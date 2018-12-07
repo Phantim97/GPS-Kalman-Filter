@@ -6,19 +6,22 @@
 #include "ArduinoSerial.h"
 #include "State.h"
 
-#include <xmmintrin.h>
-#include <immintrin.h>
+#include <tmmintrin.h> //SSSE3
 
 #include <stdlib.h>
 #include <engine.h>
+
+union
+{
+	__m128 a4;
+	float a[4];
+} sseF;
 
 std::atomic<bool> bRender = false;
 std::atomic<bool> bClearToExit = false;
 std::atomic<bool> bStartCapture = false;
 
-#define BUFSIZE 256
-
-void exitState(Serial &A, State &K)
+void exitState(Serial &A)
 {
 	while (1)
 	{
@@ -26,7 +29,6 @@ void exitState(Serial &A, State &K)
 		{
 			bRender = false;
 			A.~Serial();
-			delete &K;
 			// deconstruct matlab processes;
 			while (bRender == false)
 			{
@@ -45,6 +47,7 @@ void sensorData(Serial &A, State &K)
 	{
 		std::cout << "Connection Established\n";
 	}
+
 	Sleep(2000); //remove initial bad reads
 	while (A.IsConnected())
 	{
@@ -53,12 +56,28 @@ void sensorData(Serial &A, State &K)
 	}
 }
 
-void processingData(State &kp, State &kc, State &kn)
+__m128 velCalc(__m128 accelTable, int delay) // divide all three then sum
 {
-	//Apply Filter to data
+	__m128 delayVec = _mm_set_ps(delay, delay, delay, delay);
+	__m128 velVec = _mm_div_ps(accelTable, delayVec);
+
+	velVec = _mm_hadd_ps(accelTable, accelTable);
+	velVec = _mm_hadd_ps(velVec, velVec);
+
+	return velVec;
 }
 
-void update(double(&d)[3], double factor)
+void processingData(State &kp, State &kc, State &kn)
+{
+	__m128 preVec = _mm_set_ps(0.0f ,kp.m_acx, kp.m_acy, kp.m_acz);
+	__m128 kVec = _mm_set_ps(0.0f, kc.m_acx, kc.m_acy, kc.m_acz);
+
+	sseF.a4 = velCalc(kVec, 1000);
+	
+	float velocity = sseF.a[1];
+}
+
+void update(double(&d)[10], double factor) // sample code
 {
 	srand(time(0));
 	for (int i = 0; i < sizeof(d) / sizeof(double); i++)
@@ -70,20 +89,21 @@ void update(double(&d)[3], double factor)
 void matlabPlot(Engine *ep, mxArray *T, mxArray *D, mxArray *E, mxArray *X)
 {
 	// Render Matlab Graph
-	char buffer[BUFSIZE];
-	double timescale[3] = { 0.0, 1.0, 2.0 };
-	double darr[3] = { 0,0,0 };
-	double xarr[3] = { 0,0,0 };
-	double earr[3] = { 0,0,0 };
+	double timescale[10] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+	double darr[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	double xarr[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	double earr[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
 	if (!(ep = engOpen("\0"))) 
 	{
 		fprintf(stderr, "\nCan't start MATLAB engine\n");
 	}
+	
+	T = mxCreateDoubleMatrix(1, 10, mxREAL);
+	D = mxCreateDoubleMatrix(1, 10, mxREAL);
+	E = mxCreateDoubleMatrix(1, 10, mxREAL);
+	X = mxCreateDoubleMatrix(1, 10, mxREAL);
 
-	T = mxCreateDoubleMatrix(1, 3, mxREAL);
-	D = mxCreateDoubleMatrix(1, 3, mxREAL);
-	E = mxCreateDoubleMatrix(1, 3, mxREAL);
-	X = mxCreateDoubleMatrix(1, 3, mxREAL);
 	memcpy((void *)mxGetPr(T), (void *)timescale, sizeof(timescale));
 	memcpy((void *)mxGetPr(D), (void *)darr, sizeof(darr));
 	memcpy((void *)mxGetPr(E), (void *)earr, sizeof(earr));
@@ -93,8 +113,9 @@ void matlabPlot(Engine *ep, mxArray *T, mxArray *D, mxArray *E, mxArray *X)
 	engPutVariable(ep, "D", D);
 	engPutVariable(ep, "E", E);
 	engPutVariable(ep, "X", X);
+
 	bRender = true;
-	while (bRender)
+	while (bRender) //animating graph example
 	{
 		update(darr, 1.0);
 		update(earr, .75);
@@ -107,7 +128,8 @@ void matlabPlot(Engine *ep, mxArray *T, mxArray *D, mxArray *E, mxArray *X)
 		engPutVariable(ep, "X", X);
 		engEvalString(ep, "plot(T, D, '-o', T, E, '-o', T, X, '-o');");
 		Sleep(1000);
-	}		
+	}
+
 	mxDestroyArray(T);
 	mxDestroyArray(D);
 	mxDestroyArray(X);
@@ -120,17 +142,15 @@ void matlabPlot(Engine *ep, mxArray *T, mxArray *D, mxArray *E, mxArray *X)
 int main() //Primary Driver
 {
 	Serial *Arduino = new Serial("COM3");
-	State kprev(); State kpred();
-	State *K = new State();
-
+	State kprev(); State K; State kpred();
+	
+	//Initial MatLAB object construction
 	Engine *ep;
-	mxArray *T = NULL;
-	mxArray *D = NULL;
-	mxArray *X = NULL;
-	mxArray *E = NULL;
+	mxArray *T = NULL; mxArray *D = NULL;
+	mxArray *X = NULL; mxArray *E = NULL;
 
-	std::thread keyboardListen(exitState, std::ref(*Arduino), std::ref(*K)); // Passed Serial to destruct connection on exit
-	std::thread sensorDataGet(sensorData, std::ref(*Arduino), std::ref(*K));
+	std::thread keyboardListen(exitState, std::ref(*Arduino)); // Passed Serial to destruct connection on exit
+	std::thread sensorDataGet(sensorData, std::ref(*Arduino));
 	//std::thread processingThread(processingData);
 	std::thread matlabDisplay(matlabPlot, std::ref(ep), std::ref(T), std::ref(D), std::ref(E), std::ref(X));
 
