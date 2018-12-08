@@ -3,22 +3,18 @@
 #include <atomic>
 #include <mutex>
 #include <string>
-#include "ArduinoSerial.h"
-#include "State.h"
+#include <stdlib.h>
 
 #include <tmmintrin.h> //SSSE3
 
-#include <stdlib.h>
-#include <engine.h>
+#include "ArduinoSerial.h"
+#include "State.h"
+#include "Kalman.h"
 
-union
-{
-	__m128 a4;
-	float a[4];
-} sseF;
+#include <engine.h> //MatLAB engine
 
 std::atomic<bool> bRender = false;
-std::atomic<bool> bClearToExit = false;
+std::atomic<bool> bClearToExit = true;
 std::atomic<bool> bStartCapture = false;
 
 void exitState(Serial &A)
@@ -60,21 +56,24 @@ __m128 velCalc(__m128 accelTable, int delay) // divide all three then sum
 {
 	__m128 delayVec = _mm_set_ps(delay, delay, delay, delay);
 	__m128 velVec = _mm_div_ps(accelTable, delayVec);
-
+	
 	velVec = _mm_hadd_ps(accelTable, accelTable);
 	velVec = _mm_hadd_ps(velVec, velVec);
 
 	return velVec;
 }
 
-void processingData(State &kp, State &kc, State &kn)
+void processingData(State &kp, State &kc)
 {
+	//process accelerometer velocity
 	__m128 preVec = _mm_set_ps(0.0f ,kp.m_acx, kp.m_acy, kp.m_acz);
 	__m128 kVec = _mm_set_ps(0.0f, kc.m_acx, kc.m_acy, kc.m_acz);
+	sseF.a4 = velCalc(preVec, ARDUINO_DELAY);
+	kp.m_velocity = sseF.a[1];
+	sseF.a4 = velCalc(kVec, ARDUINO_DELAY);
+	kc.m_velocity = sseF.a[1] + kp.m_velocity;
 
-	sseF.a4 = velCalc(kVec, 1000);
-	
-	float velocity = sseF.a[1];
+
 }
 
 void update(double(&d)[10], double factor) // sample code
@@ -145,19 +144,19 @@ int main() //Primary Driver
 	State kprev(); State K; State kpred();
 	
 	//Initial MatLAB object construction
-	Engine *ep;
-	mxArray *T = NULL; mxArray *D = NULL;
-	mxArray *X = NULL; mxArray *E = NULL;
+	//Engine *ep;
+	//mxArray *T = NULL; mxArray *D = NULL;
+	//mxArray *X = NULL; mxArray *E = NULL;
 
 	std::thread keyboardListen(exitState, std::ref(*Arduino)); // Passed Serial to destruct connection on exit
-	std::thread sensorDataGet(sensorData, std::ref(*Arduino));
+	std::thread sensorDataGet(sensorData, std::ref(*Arduino), std::ref(K));
 	//std::thread processingThread(processingData);
-	std::thread matlabDisplay(matlabPlot, std::ref(ep), std::ref(T), std::ref(D), std::ref(E), std::ref(X));
+	//std::thread matlabDisplay(matlabPlot, std::ref(ep), std::ref(T), std::ref(D), std::ref(E), std::ref(X));
 
 	keyboardListen.join();
 	sensorDataGet.join();
 	//processingThread.join();
-	matlabDisplay.join();
+	//matlabDisplay.join();
 
 	return 0;
 }
