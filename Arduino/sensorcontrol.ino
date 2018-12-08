@@ -73,9 +73,9 @@ void incMPUData(){
   Wire.endTransmission(false);
   Wire.requestFrom(MPU_addr,14,true);  // request a total of 14 registers
   
-  sensorData[6]+=Wire.read()<<8|Wire.read()-AcX1;  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)    
-  sensorData[7]+=Wire.read()<<8|Wire.read()-AcX1;  // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
-  sensorData[8]+=Wire.read()<<8|Wire.read()-AcX1;  // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
+  sensorData[6]+=(Wire.read()<<8|Wire.read())-sensorData[6];  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)    
+  sensorData[7]+=(Wire.read()<<8|Wire.read())-sensorData[7];  // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
+  sensorData[8]+=(Wire.read()<<8|Wire.read())-sensorData[8];  // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
   Tmp=Wire.read()<<8|Wire.read();  // 0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
   sensorData[9]+=Wire.read()<<8|Wire.read();  // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
   sensorData[10]+=Wire.read()<<8|Wire.read();  // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
