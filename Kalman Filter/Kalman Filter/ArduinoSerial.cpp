@@ -38,7 +38,7 @@ Serial::Serial(const char *portName)
 		else
 		{
 			//Define serial connection parameters for the arduino board
-			dcbSerialParams.BaudRate = CBR_9600;
+			dcbSerialParams.BaudRate = CBR_115200;
 			dcbSerialParams.ByteSize = 8;
 			dcbSerialParams.StopBits = ONESTOPBIT;
 			dcbSerialParams.Parity = NOPARITY;
@@ -135,44 +135,10 @@ bool Serial::ReadData(State &K)
 					}
 				}
 				K.dataSet(sensorReadings);
+				K.m_time = (float)time(0); // set current time
 				K.printDataSet();
 				std::cout << "End\n";
 				return true;
-			}
-		}
-	}
-}
-
-void Serial::ReadTest(State &K)
-{
-	DWORD bytesRead;
-	unsigned int toRead;
-	unsigned char buffer[1025] = { 0 };
-
-	ClearCommError(this->hSerial, &this->errors, &this->status);
-
-	union
-	{
-		float f;
-		unsigned char bytes[4];
-	} u;
-
-	float myfloats[12];
-
-	while (1)
-	{
-		ReadFile(this->hSerial, buffer, 1, &bytesRead, NULL);
-		if (buffer[0] == 0x90)
-		{
-			std::cout << "Start\n";
-			ReadFile(this->hSerial, buffer, 1, &bytesRead, NULL);
-			toRead = (int)buffer[0];
-			ReadFile(this->hSerial, buffer, toRead, &bytesRead, NULL);
-			std::cout << "BytesRead: " << bytesRead;
-			ReadFile(this->hSerial, buffer, 1, &bytesRead, NULL);
-			if (buffer[0] == 0x10)
-			{
-				break;
 			}
 		}
 	}

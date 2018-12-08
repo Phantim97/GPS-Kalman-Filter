@@ -5,7 +5,6 @@
 #include <string>
 #include "ArduinoSerial.h"
 #include "State.h"
-#include <queue>
 
 #include <tmmintrin.h> //SSSE3
 
@@ -30,7 +29,7 @@ void exitState(Serial &A)
 		{
 			bRender = false;
 			A.~Serial();
-			// deconstruct matlab processes;
+			// deconstruct matlab processes
 			while (bRender == false)
 			{
 				if (bClearToExit == true)
@@ -49,7 +48,7 @@ void sensorData(Serial &A, State &K)
 		std::cout << "Connection Established\n";
 	}
 
-	Sleep(2000); //remove initial bad reads
+	Sleep(2000); //skip initial bad reads
 	while (A.IsConnected())
 	{
 		A.ReadData(K);
@@ -57,14 +56,14 @@ void sensorData(Serial &A, State &K)
 	}
 }
 
-__m128 velCalc(__m128 accelTable, int delay) // divide all three then sum
+inline __m128 velCalc(__m128 accelPrev, __m128 accelCurr, float deltaT)
 {
-	__m128 delayVec = _mm_set_ps(delay, delay, delay, delay);
-	__m128 velVec = _mm_div_ps(accelTable, delayVec);
-
-	velVec = _mm_hadd_ps(accelTable, accelTable);
+	__m128 deltaVec = _mm_set_ps(deltaT, deltaT, deltaT, deltaT);
+	__m128 velVec = _mm_add_ps(accelPrev, accelCurr);
+	
+	velVec = _mm_mul_ps(velVec, deltaVec);
 	velVec = _mm_hadd_ps(velVec, velVec);
-
+	
 	return velVec;
 }
 
@@ -72,23 +71,22 @@ void processingData(State &kp, State &kc, State &kn)
 {
 	__m128 preVec = _mm_set_ps(0.0f ,kp.m_acx, kp.m_acy, kp.m_acz);
 	__m128 kVec = _mm_set_ps(0.0f, kc.m_acx, kc.m_acy, kc.m_acz);
-
-	sseF.a4 = velCalc(kVec, 1000);
-	
-	float velocity = sseF.a[1];
+	float deltaT = (kc.m_time - kp.m_time);
+	sseF.a4 = velCalc(preVec, kVec, deltaT);
+	kc.m_velocity = sseF.a[1];
 }
 
-void update(double(&d)[10]) //template code
+void update(double(&d)[10], float val)
 {
 	int i = 0;
 	for (i = 0; i < (sizeof(d) /sizeof(double)) - 1; i++)
 	{	
 		d[i] = d[i + 1];
 	}
-	d[i] = d[i - 1] + 5; 
+	d[i] = val; 
 }
 
-void matlabPlot(Engine *ep, mxArray *T, mxArray *D, mxArray *E, mxArray *X)
+void matlabPlot(Engine *ep, mxArray *T, mxArray *D, mxArray *E, mxArray *X, State &k)
 {
 	// Render Matlab Graph
 	double timescale[10] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
@@ -112,17 +110,17 @@ void matlabPlot(Engine *ep, mxArray *T, mxArray *D, mxArray *E, mxArray *X)
 	memcpy((void *)mxGetPr(E), (void *)earr, sizeof(earr));
 	memcpy((void *)mxGetPr(X), (void *)xarr, sizeof(xarr));
 
-	engPutVariable(ep, "T", T);
-	engPutVariable(ep, "D", D);
-	engPutVariable(ep, "E", E);
-	engPutVariable(ep, "X", X);
+	engPutVariable(ep, "T", T); // time axis
+	engPutVariable(ep, "D", D); // gps velocity
+	engPutVariable(ep, "E", E); // accel velocity
+	engPutVariable(ep, "X", X); // filter result
 
 	bRender = true;
-	while (bRender) //animating graph example
+	while (bRender) //animating graph
 	{
-		update(darr);
-		update(earr);
-		update(xarr);
+		update(darr, k.m_mph);
+		update(earr, k.m_velocity);
+		update(xarr, k.m_estimateVel);
 		memcpy((void *)mxGetPr(D), (void *)darr, sizeof(darr));
 		memcpy((void *)mxGetPr(X), (void *)xarr, sizeof(xarr));
 		memcpy((void *)mxGetPr(E), (void *)earr, sizeof(earr));
@@ -153,9 +151,9 @@ int main() //Primary Driver
 	mxArray *X = NULL; mxArray *E = NULL;
 
 	std::thread keyboardListen(exitState, std::ref(*Arduino)); // Passed Serial to destruct connection on exit
-	std::thread sensorDataGet(sensorData, std::ref(*Arduino));
+	std::thread sensorDataGet(sensorData, std::ref(*Arduino), std::ref(K));
 	//std::thread processingThread(processingData);
-	std::thread matlabDisplay(matlabPlot, std::ref(ep), std::ref(T), std::ref(D), std::ref(E), std::ref(X));
+	std::thread matlabDisplay(matlabPlot, std::ref(ep), std::ref(T), std::ref(D), std::ref(E), std::ref(X), std::ref(K));
 
 	keyboardListen.join();
 	sensorDataGet.join();

@@ -5,7 +5,7 @@ State::State()
 	this->m_deg = 0; this->m_mph = 0; this->m_sat = 0;
 	this->m_acx = 0; this->m_acy = 0; this->m_acz = 0;
 	this->m_gyx = 0; this->m_gyy = 0; this->m_gyz = 0;
-	this->m_kalGain = .5;
+	this->m_kalGain = .5; this->m_time; this->m_estimateVel = 0;
 }
 
 void State::dataSet(float sensorData[12])
@@ -23,7 +23,7 @@ State::State(State &other)
 	this->m_deg = other.m_deg; this->m_mph = other.m_mph; this->m_sat = other.m_sat; 
 	this->m_acx = other.m_acx; this->m_acy = other.m_acy; this->m_acz = other.m_acz;
 	this->m_gyx = other.m_gyx; this->m_gyy = other.m_gyy; this->m_gyz = other.m_gyz;
-	this->m_kalGain = other.m_kalGain;
+	this->m_kalGain = other.m_kalGain; this->m_time = other.m_time; this->m_estimateVel = other.m_estimateVel;
 }
 
 void State::printDataSet()
