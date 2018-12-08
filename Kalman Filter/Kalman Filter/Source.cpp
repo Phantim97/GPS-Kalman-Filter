@@ -79,6 +79,12 @@ void processingData(State &kp, State &kc)
 	sseF.a4 = velCalc(preVec, kVec, deltaT);
 	kc.m_velocity = sseF.a[1];
 
+	//check if GPS is viable absolute
+	if (kc.getSat() < 1)
+	{
+		kc.m_mph = kc.m_velocity;
+	}
+
 	// run the kalman filter
 	Kalman::calcGain(kp, kc);
 	Kalman::calcCurrentEstimate(kp, kc);
@@ -86,7 +92,6 @@ void processingData(State &kp, State &kc)
 
 	//move constructor TODO: Investigate
 	kp = kc; // current state to previous state
-
 }
 
 void update(double(&d)[10], float val)
@@ -134,8 +139,8 @@ void matlabPlot(Engine *ep, mxArray *T, mxArray *D, mxArray *E, mxArray *X, Stat
 		std::thread anim1(update, std::ref(darr), K.m_mph);
 		std::thread anim2(update, std::ref(earr), K.m_velocity);
 		std::thread anim3(update, std::ref(xarr), K.m_estimateVel);
-		anim1.join(); 
-		anim2.join(); 
+		anim1.join();
+		anim2.join();
 		anim3.join();
 		memcpy((void *)mxGetPr(D), (void *)darr, sizeof(darr));
 		memcpy((void *)mxGetPr(X), (void *)xarr, sizeof(xarr));

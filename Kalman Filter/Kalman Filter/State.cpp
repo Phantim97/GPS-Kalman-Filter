@@ -48,3 +48,8 @@ void State::printDataSet()
 	std::cout << "MPU:\n";
 	std::cout << "ACX: " << this->m_acx << " | ACY: " << this->m_acy << " | ACZ: " << this->m_acx << " | GYX: " << this->m_gyx << " | GYY: " << this->m_gyy << " | GYZ: " << this->m_gyz << '\n';
 }
+
+float State::getSat()
+{
+	return this->m_sat;
+}

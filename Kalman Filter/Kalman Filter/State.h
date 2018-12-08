@@ -22,4 +22,5 @@ public:
 	State(const State &other); //Investigate
 	void dataSet(float sensorData[12]); // Arduino data -> object
 	void printDataSet();
+	float getSat();
 };
