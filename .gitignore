@@ -328,3 +328,5 @@ ASALocalRun/
 
 # MFractors (Xamarin productivity tool) working folder 
 .mfractor/
+/Arduino/sensorcontrol/sensorcontrol.ino
+/Arduino/sensorcontrol2/sensorcontrol2.ino

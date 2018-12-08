@@ -38,7 +38,7 @@ Serial::Serial(const char *portName)
 		else
 		{
 			//Define serial connection parameters for the arduino board
-			dcbSerialParams.BaudRate = CBR_9600;
+			dcbSerialParams.BaudRate = CBR_115200;
 			dcbSerialParams.ByteSize = 8;
 			dcbSerialParams.StopBits = ONESTOPBIT;
 			dcbSerialParams.Parity = NOPARITY;
@@ -55,7 +55,6 @@ Serial::Serial(const char *portName)
 			{
 				this->connected = true;
 				PurgeComm(this->hSerial, PURGE_RXCLEAR | PURGE_TXCLEAR); // clear data buffer
-				Sleep(ARDUINO_WAIT_TIME);
 			}
 		}
 	}
@@ -71,39 +70,93 @@ Serial::~Serial()
 	}
 }
 
-int Serial::ReadData(char *buffer, unsigned int nbChar)
+bool Serial::ReadData(State &K)
 {
 	DWORD bytesRead;
-	unsigned int toRead;
+	unsigned int toRead = 0;
+	unsigned char buffer[384] = { 0 };
 
-	ClearCommError(this->hSerial, &this->errors, &this->status); // derive status on board
+	ClearCommError(this->hSerial, &this->errors, &this->status);
 
-	//Check if there is something to read
-	if (this->status.cbInQue > 0)
+	union 
 	{
-		//If there is we check if there is enough data to read the required number
-		//of characters, if not we'll read only the available characters to prevent
-		//locking of the application.
-		if (this->status.cbInQue > nbChar)
-		{
-			toRead = nbChar;
-		}
-		else
-		{
-			toRead = this->status.cbInQue;
-		}
+		float f;
+		unsigned char bytes[4];
+	} u;
 
-		//Try to read the require number of chars, and return the number of read bytes on success
-		if (ReadFile(this->hSerial, buffer, toRead, &bytesRead, NULL))
-		{
-			return bytesRead;
-		}
+	float sensorReadings[12]; //sensordata
 
+	while (1)
+	{
+		
+		ReadFile(this->hSerial, buffer, 1, &bytesRead, NULL);
+		if (buffer[0] == 0x90)
+		{
+			std::cout << "Start\n";
+			int i = 0;
+			while (buffer[0] != 0x10)
+			{
+				ReadFile(this->hSerial, buffer, 4, &bytesRead, NULL);
+				toRead += 4;
+				if (toRead > 384)
+				{
+					std::cout << "BAD READ!\n";
+					return false;
+				}
+				if (i < 12)
+				{
+					u.bytes[0] = buffer[0];
+					u.bytes[1] = buffer[1];
+					u.bytes[2] = buffer[2];
+					u.bytes[3] = buffer[3];
+					sensorReadings[i] = u.f;
+					i++;
+				}
+			}
+			if (buffer[0] == 0x10)
+			{
+				bool bBadRead = false;
+				if (sensorReadings[11] == 0 && sensorReadings[10] == 0 && sensorReadings[9] == 0 && sensorReadings[8] == 0 && sensorReadings[7] == 0 && sensorReadings[6] == 0)
+				{
+					std::cout << "INVALID AC/GY READ!\n";
+					return false;
+				}
+				if ((sensorReadings[0] < -180 || sensorReadings[1] < -180) || (sensorReadings[0] > 180 || sensorReadings[1] > 180))
+				{
+					std::cout << "BAD LAT/LONG READ!\n";
+					return false;
+				}
+				for (int i = 0; i < sizeof(sensorReadings) / sizeof(float); i++)
+				{
+					if (sensorReadings[i] > 1000 || sensorReadings[i] < -1000)
+					{
+						std::cout << "BAD ELEMENT READ!\n";
+						return false;
+					}
+				}
+				K.dataSet(sensorReadings);
+				K.m_time = (float)time(0); // set current time
+				K.printDataSet();
+				std::cout << "End\n";
+				return true;
+			}
+		}
 	}
+}
 
-	//If nothing has been read, or that an error was detected return 0
-	return 0;
+bool Serial::WriteData(unsigned char c)
+{
+	DWORD bytesSent;
 
+	if (!WriteFile(this->hSerial, &c, 1 ,&bytesSent, 0))
+	{
+		ClearCommError(this->hSerial, &this->errors, &this->status);
+		return false;
+	}
+	else
+	{
+		return true;
+	}
 }
 
 bool Serial::IsConnected()
