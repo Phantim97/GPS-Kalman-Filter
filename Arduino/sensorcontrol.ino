@@ -91,13 +91,13 @@ void calibrate(){
 }
 void calcMPUData(){
   //acc*mph/s conversion/ g's to m/s^2 /max g limint /#of incs
-  sensorData[6] = (sensorData[6]*2.236936/9.81/16384.0/MS);
-  sensorData[7] = (sensorData[7]*2.236936/9.81/16384.0/MS);
-  sensorData[8] = (sensorData[8]*2.236936/9.81/16384.0/MS);
+  sensorData[6] = (sensorData[6]*2.236936/9.81/16384.0);
+  sensorData[7] = (sensorData[7]*2.236936/9.81/16384.0);
+  sensorData[8] = (sensorData[8]*2.236936/9.81/16384.0);
   //Serial.print(" "); Serial.print(Tmp/340.00+36.53);  //equation for temperature in degrees C from datasheet
-  sensorData[9] = (sensorData[9]/131.0)/MS;
-  sensorData[10] = (sensorData[10]/131.0)/MS;
-  sensorData[11] = (sensorData[11]/131.0)/MS;
+  sensorData[9] = (sensorData[9]/131.0);
+  sensorData[10] = (sensorData[10]/131.0);
+  sensorData[11] = (sensorData[11]/131.0);
   blinkState = !blinkState;
 }
 
