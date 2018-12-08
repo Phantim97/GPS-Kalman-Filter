@@ -5,6 +5,7 @@
 #include <string>
 #include "ArduinoSerial.h"
 #include "State.h"
+#include <queue>
 
 #include <tmmintrin.h> //SSSE3
 
@@ -77,13 +78,14 @@ void processingData(State &kp, State &kc, State &kn)
 	float velocity = sseF.a[1];
 }
 
-void update(double(&d)[10], double factor) // sample code
+void update(double(&d)[10]) //template code
 {
-	srand(time(0));
-	for (int i = 0; i < sizeof(d) / sizeof(double); i++)
-	{
-		d[i] = (rand() % 100) * factor;
+	int i = 0;
+	for (i = 0; i < (sizeof(d) /sizeof(double)) - 1; i++)
+	{	
+		d[i] = d[i + 1];
 	}
+	d[i] = d[i - 1] + 5; 
 }
 
 void matlabPlot(Engine *ep, mxArray *T, mxArray *D, mxArray *E, mxArray *X)
@@ -93,6 +95,7 @@ void matlabPlot(Engine *ep, mxArray *T, mxArray *D, mxArray *E, mxArray *X)
 	double darr[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 	double xarr[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 	double earr[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
 
 	if (!(ep = engOpen("\0"))) 
 	{
@@ -117,9 +120,9 @@ void matlabPlot(Engine *ep, mxArray *T, mxArray *D, mxArray *E, mxArray *X)
 	bRender = true;
 	while (bRender) //animating graph example
 	{
-		update(darr, 1.0);
-		update(earr, .75);
-		update(xarr, .5);
+		update(darr);
+		update(earr);
+		update(xarr);
 		memcpy((void *)mxGetPr(D), (void *)darr, sizeof(darr));
 		memcpy((void *)mxGetPr(X), (void *)xarr, sizeof(xarr));
 		memcpy((void *)mxGetPr(E), (void *)earr, sizeof(earr));
