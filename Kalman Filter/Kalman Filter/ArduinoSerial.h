@@ -21,7 +21,6 @@ public:
 	bool ReadData(State &k);
 	bool WriteData(unsigned char c);
 	bool IsConnected();
-	void ReadTest(State &K);
 };
 
 #endif // SERIALCLASS_H_INCLUDED
