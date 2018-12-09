@@ -28,7 +28,6 @@ void State::dataSet(float sensorData[13])
 
 State& State::operator=(State &&other) 
 {
-	std::cout << "Move Assignment\n";
 	m_acx = other.m_acx; m_acy = other.m_acy; m_acz = other.m_acz;
 	m_deltaT = other.m_deltaT; m_velocity = other.m_velocity;
 	m_estimateVel = other.m_estimateVel; m_mph = other.m_mph;

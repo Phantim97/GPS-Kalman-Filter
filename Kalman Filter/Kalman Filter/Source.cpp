@@ -63,12 +63,9 @@ void processingData(State &kp, State &kc)
 		__m128 preVec = _mm_set_ps(0.0f, kp.m_acx, kp.m_acy, kp.m_acz);
 		__m128 kVec = _mm_set_ps(0.0f, kc.m_acx, kc.m_acy, kc.m_acz);
 		// For Debugging
-		std::cout << "KP TIME: " << kp.m_deltaT << " KC TIME: " << kc.m_deltaT << '\n';
-		std::cout << "KP ACX: " << kp.m_acx << " KC ACX: " << kc.m_acx << '\n';
 		float deltaT = kc.m_deltaT/1000;
 		std::cout << "deltaT: " << deltaT << '\n'; // for debugging
 		sseF.a4 = velCalc(preVec, kVec, deltaT);
-		std::cout << "SSEF A1: " << sseF.a[1] << '\n';
 		kc.m_velocity = sseF.a[1]; //doesn't matter which index
 
 		//check if GPS is viable absolute
@@ -166,9 +163,9 @@ void matlabPlot(Engine *ep, mxArray *T, mxArray *D, mxArray *E, mxArray *X, Stat
 	{
 		bGraphed = false;
 		mu.lock();
-		std::thread anim1(update, std::ref(darr), K.m_mph);
-		std::thread anim2(update, std::ref(earr), K.m_velocity);
-		std::thread anim3(update, std::ref(xarr), K.m_estimateVel);
+		std::thread anim1(update, std::ref(darr), abs(K.m_mph));
+		std::thread anim2(update, std::ref(earr), abs(K.m_velocity));
+		std::thread anim3(update, std::ref(xarr), abs(K.m_estimateVel));
 		anim1.join();
 		anim2.join();
 		anim3.join();
