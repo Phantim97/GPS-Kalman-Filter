@@ -8,8 +8,8 @@ union
   byte fbytes[4];
 } u;
 
-float sensorData[12];
-byte sensorByteData[394];
+float sensorData[13];
+byte sensorByteData[54];
 
 TinyGPSPlus tinyGPS; // derives GPS data from module
 
@@ -17,7 +17,6 @@ TinyGPSPlus tinyGPS; // derives GPS data from module
 #define GPS_RX 4
 #define GPS_BAUD 115200
 #define MS 1000
-
 
 const int MPU_addr=0x68;  // I2C address of the MPU-6050
 #define MPU6050_ACCEL_FS_2 0x00
@@ -65,6 +64,7 @@ static void smartDelay(unsigned long ms)
     while (myGPS.available())
       tinyGPS.encode(myGPS.read()); // Send it to the encode function
   } while (millis() - start < ms);
+  sensorData[12] = (float)((millis() - start));
 }
 
 void incMPUData(){
@@ -73,9 +73,9 @@ void incMPUData(){
   Wire.endTransmission(false);
   Wire.requestFrom(MPU_addr,14,true);  // request a total of 14 registers
   
-  sensorData[6]+=(Wire.read()<<8|Wire.read())-sensorData[6];  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)    
-  sensorData[7]+=(Wire.read()<<8|Wire.read())-sensorData[7];  // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
-  sensorData[8]+=(Wire.read()<<8|Wire.read())-sensorData[8];  // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
+  sensorData[6]+=(Wire.read()<<8|Wire.read())-2*sensorData[6];  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)    
+  sensorData[7]+=(Wire.read()<<8|Wire.read())-2*sensorData[7];  // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
+  sensorData[8]+=(Wire.read()<<8|Wire.read())-2*sensorData[8];  // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
   Tmp=Wire.read()<<8|Wire.read();  // 0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
   sensorData[9]+=Wire.read()<<8|Wire.read();  // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
   sensorData[10]+=Wire.read()<<8|Wire.read();  // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
@@ -101,13 +101,12 @@ void calcMPUData(){
   blinkState = !blinkState;
 }
 
-
 //Insert a proper send/recv here
 void dataSend()
 {
   Serial.write(0x90);
   delay(10);
-  for (int i = 0; i < 12; i++)
+  for (int i = 0; i < 13; i++)
   {
     u.f = sensorData[i];
     for (byte j = 0; j < 4; j++)
@@ -117,7 +116,6 @@ void dataSend()
     }
     //sensorData[i] = 0;
   }
-  
   Serial.write(0x10);
   delay(10);
 }
@@ -128,5 +126,5 @@ void loop()
   calcMPUData();
   dataSend();
   smartDelay(MS);
-  Serial.flush(); 
+  Serial.flush();
 }

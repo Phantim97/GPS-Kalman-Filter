@@ -1,6 +1,6 @@
 #pragma once
 #include <iostream>
-
+#include <ctime>
 class State
 {
 private:
@@ -11,7 +11,7 @@ private:
 public:
 	//Data
 	float m_acx; float m_acy; float m_acz; 
-	float m_mph; float m_time;
+	float m_mph; float m_deltaT;
 	
 	//Calculated data
 	float m_velocity; float m_kalGain; float m_estimateVel;
@@ -19,7 +19,7 @@ public:
 
 	State();
 	~State();
-	State(const State &other); //Investigate
+	State& operator=(State &&other);
 	void dataSet(float sensorData[12]); // Arduino data -> object
 	void printDataSet();
 	float getSat();

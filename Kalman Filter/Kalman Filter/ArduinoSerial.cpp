@@ -14,18 +14,21 @@ Serial::Serial(const char *portName)
 		NULL);
 
 	//Validate Connection
-	if (this->hSerial == INVALID_HANDLE_VALUE)
-	{
-		//If not success full display an Error
-		if (GetLastError() == ERROR_FILE_NOT_FOUND) 
+
+		if (this->hSerial == INVALID_HANDLE_VALUE)
 		{
-			printf("ERROR: Handle was not attached. Reason: %s not available.\n", portName);
+			//If not success full display an Error
+			if (GetLastError() == ERROR_FILE_NOT_FOUND)
+			{
+				printf("ERROR: Handle was not attached. Reason: %s not available.\n", portName);
+				exit(2);
+			}
+			else
+			{
+				printf("ERROR!!!");
+				exit(3);
+			}
 		}
-		else
-		{
-			printf("ERROR!!!");
-		}
-	}
 	else
 	{
 		//If connected we try to set the comm parameters
@@ -74,7 +77,7 @@ bool Serial::ReadData(State &K)
 {
 	DWORD bytesRead;
 	unsigned int toRead = 0;
-	unsigned char buffer[384] = { 0 };
+	unsigned char buffer[60] = { 0 };
 
 	ClearCommError(this->hSerial, &this->errors, &this->status);
 
@@ -84,7 +87,7 @@ bool Serial::ReadData(State &K)
 		unsigned char bytes[4];
 	} u;
 
-	float sensorReadings[12]; //sensordata
+	float sensorReadings[13]; //sensordata
 
 	while (1)
 	{
@@ -98,12 +101,12 @@ bool Serial::ReadData(State &K)
 			{
 				ReadFile(this->hSerial, buffer, 4, &bytesRead, NULL);
 				toRead += 4;
-				if (toRead > 384)
+				if (toRead > 58)
 				{
 					std::cout << "BAD READ!\n";
 					return false;
 				}
-				if (i < 12)
+				if (i < 13)
 				{
 					u.bytes[0] = buffer[0];
 					u.bytes[1] = buffer[1];
@@ -128,14 +131,14 @@ bool Serial::ReadData(State &K)
 				}
 				for (int i = 0; i < sizeof(sensorReadings) / sizeof(float); i++)
 				{
-					if (sensorReadings[i] > 1000 || sensorReadings[i] < -1000)
+					if (sensorReadings[i] > 1000000000 || sensorReadings[i] < -1000000000)
 					{
 						std::cout << "BAD ELEMENT READ!\n";
 						return false;
 					}
 				}
 				K.dataSet(sensorReadings);
-				K.m_time = (float)time(0); // set current time
+				//K.m_time = time(0); // set current time
 				K.printDataSet();
 				std::cout << "End\n";
 				return true;
