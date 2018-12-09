@@ -115,7 +115,7 @@ void dataSend()
       Serial.write(u.fbytes[j]);
       //delay(10);
     }
-    sensorData[i] = 0;
+    //sensorData[i] = 0;
   }
   
   Serial.write(0x10);
