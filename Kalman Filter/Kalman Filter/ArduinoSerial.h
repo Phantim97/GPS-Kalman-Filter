@@ -4,7 +4,6 @@
 #include <Windows.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <ctime>
 #include "State.h"
 
 class Serial

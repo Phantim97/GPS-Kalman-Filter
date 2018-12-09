@@ -11,6 +11,8 @@
 #include <stdlib.h>
 #include <engine.h>
 
+std::mutex mu;
+
 union
 {
 	__m128 a4;
@@ -20,6 +22,8 @@ union
 std::atomic<bool> bRender = false;
 std::atomic<bool> bClearToExit = false;
 std::atomic<bool> bStartCapture = false;
+std::atomic<bool> bGraphed = false;
+std::atomic<bool> bEngineLoaded = false;
 
 void exitState(Serial &A, State &Kp, State &Kc)
 {
@@ -35,8 +39,6 @@ void exitState(Serial &A, State &Kp, State &Kc)
 				if (bClearToExit == true)
 				{
 					// TODO: Handle deallocation of states
-					//Kp.~State();
-					//Kc.~State();
 					exit(1);
 				}
 			}
@@ -44,7 +46,50 @@ void exitState(Serial &A, State &Kp, State &Kc)
 	}
 }
 
-void sensorData(Serial &A, State &K)
+inline __m128 velCalc(__m128 accelPrev, __m128 accelCurr, float deltaT)
+{
+	__m128 deltaVec = _mm_set_ps(deltaT, deltaT, deltaT, deltaT);
+	__m128 velVec = _mm_add_ps(accelPrev, accelCurr);
+
+	velVec = _mm_mul_ps(velVec, deltaVec);
+	velVec = _mm_hadd_ps(velVec, velVec);
+	velVec = _mm_hadd_ps(velVec, velVec);
+	return velVec;
+}
+
+void processingData(State &kp, State &kc)
+{
+		// velocity calculation from accelerometer
+		__m128 preVec = _mm_set_ps(0.0f, kp.m_acx, kp.m_acy, kp.m_acz);
+		__m128 kVec = _mm_set_ps(0.0f, kc.m_acx, kc.m_acy, kc.m_acz);
+		// For Debugging
+		std::cout << "KP TIME: " << kp.m_deltaT << " KC TIME: " << kc.m_deltaT << '\n';
+		std::cout << "KP ACX: " << kp.m_acx << " KC ACX: " << kc.m_acx << '\n';
+		float deltaT = kc.m_deltaT/1000;
+		std::cout << "deltaT: " << deltaT << '\n'; // for debugging
+		sseF.a4 = velCalc(preVec, kVec, deltaT);
+		std::cout << "SSEF A1: " << sseF.a[1] << '\n';
+		kc.m_velocity = sseF.a[1]; //doesn't matter which index
+
+		//check if GPS is viable absolute
+		if (kc.getSat() < 1)
+		{
+			std::cout << "NO SATS\n";
+			kc.m_mph = kc.m_velocity;
+		}
+
+		// run the kalman filter
+		Kalman::calcGain(kp, kc);
+		Kalman::calcCurrentEstimate(kp, kc);
+		Kalman::calcErrorNewEstimate(kp, kc);
+		//kc.m_estimateVel = kp.m_estimateVel + kc.m_estimateVel;
+		//Debug statements
+		std::cout << "KG: " <<  kc.m_kalGain << '\n';
+		std::cout << "EST VEL: " << kc.m_estimateVel << '\n';
+		std::cout << "CURR VEL: "<< kc.m_velocity << '\n';
+}
+
+void sensorData(Serial &A, State &Kp, State &K)
 {
 	if (A.IsConnected())
 	{
@@ -54,44 +99,25 @@ void sensorData(Serial &A, State &K)
 	Sleep(2000); //skip initial bad reads
 	while (A.IsConnected())
 	{
-		A.ReadData(K);
+		if (bGraphed)
+		{
+			mu.lock();
+			Kp = std::move(K);
+			mu.unlock();
+		}
+		mu.lock();
+		if (A.ReadData(K))
+		{
+			processingData(Kp, K);
+			if (!bEngineLoaded)
+			{
+				Kp = std::move(K);
+			}
+		}
+		mu.unlock();
+		
 		Sleep(10);
 	}
-}
-
-inline __m128 velCalc(__m128 accelPrev, __m128 accelCurr, float deltaT)
-{
-	__m128 deltaVec = _mm_set_ps(deltaT, deltaT, deltaT, deltaT);
-	__m128 velVec = _mm_add_ps(accelPrev, accelCurr);
-	
-	velVec = _mm_mul_ps(velVec, deltaVec);
-	velVec = _mm_hadd_ps(velVec, velVec);
-	
-	return velVec;
-}
-
-void processingData(State &kp, State &kc)
-{
-	// velocity calculation from accelerometer
-	__m128 preVec = _mm_set_ps(0.0f ,kp.m_acx, kp.m_acy, kp.m_acz);
-	__m128 kVec = _mm_set_ps(0.0f, kc.m_acx, kc.m_acy, kc.m_acz);
-	float deltaT = (kc.m_time - kp.m_time);
-	sseF.a4 = velCalc(preVec, kVec, deltaT);
-	kc.m_velocity = sseF.a[1];
-
-	//check if GPS is viable absolute
-	if (kc.getSat() < 1)
-	{
-		kc.m_mph = kc.m_velocity;
-	}
-
-	// run the kalman filter
-	Kalman::calcGain(kp, kc);
-	Kalman::calcCurrentEstimate(kp, kc);
-	Kalman::calcErrorNewEstimate(kp, kc);
-
-	//move constructor TODO: Investigate
-	kp = kc; // current state to previous state
 }
 
 void update(double(&d)[10], float val)
@@ -118,6 +144,8 @@ void matlabPlot(Engine *ep, mxArray *T, mxArray *D, mxArray *E, mxArray *X, Stat
 		fprintf(stderr, "\nCan't start MATLAB engine\n");
 	}
 	
+	bEngineLoaded = true;
+
 	T = mxCreateDoubleMatrix(1, 10, mxREAL);
 	D = mxCreateDoubleMatrix(1, 10, mxREAL);
 	E = mxCreateDoubleMatrix(1, 10, mxREAL);
@@ -136,12 +164,15 @@ void matlabPlot(Engine *ep, mxArray *T, mxArray *D, mxArray *E, mxArray *X, Stat
 	bRender = true;
 	while (bRender) //animating graph
 	{
+		bGraphed = false;
+		mu.lock();
 		std::thread anim1(update, std::ref(darr), K.m_mph);
 		std::thread anim2(update, std::ref(earr), K.m_velocity);
 		std::thread anim3(update, std::ref(xarr), K.m_estimateVel);
 		anim1.join();
 		anim2.join();
 		anim3.join();
+		mu.unlock();
 		memcpy((void *)mxGetPr(D), (void *)darr, sizeof(darr));
 		memcpy((void *)mxGetPr(X), (void *)xarr, sizeof(xarr));
 		memcpy((void *)mxGetPr(E), (void *)earr, sizeof(earr));
@@ -149,7 +180,8 @@ void matlabPlot(Engine *ep, mxArray *T, mxArray *D, mxArray *E, mxArray *X, Stat
 		engPutVariable(ep, "E", E);
 		engPutVariable(ep, "X", X);
 		engEvalString(ep, "plot(T, D, '-o', T, E, '-o', T, X, '-o');");
-		Sleep(1000);
+		bGraphed = true;
+		Sleep(50);
 	}
 
 	mxDestroyArray(T);
@@ -164,7 +196,7 @@ void matlabPlot(Engine *ep, mxArray *T, mxArray *D, mxArray *E, mxArray *X, Stat
 int main() //Primary Driver
 {
 	Serial *Arduino = new Serial("COM3");
-	State *Kprev = new State(); 
+	State *Kprev = new State();
 	State *K = new State();
 	
 	//Initial MatLAB object construction
@@ -173,13 +205,11 @@ int main() //Primary Driver
 	mxArray *X = NULL; mxArray *E = NULL;
 
 	std::thread keyboardListen(exitState, std::ref(*Arduino), std::ref(*Kprev), std::ref(*K)); // Passed Serial to destruct connection on exit
-	std::thread sensorDataGet(sensorData, std::ref(*Arduino), std::ref(*K));
-	std::thread processingThread(processingData, std::ref(*Kprev), std::ref(*K));
+	std::thread sensorDataGet(sensorData, std::ref(*Arduino), std::ref(*Kprev), std::ref(*K));
 	std::thread matlabDisplay(matlabPlot, std::ref(ep), std::ref(T), std::ref(D), std::ref(E), std::ref(X), std::ref(*K));
 
 	keyboardListen.join();
 	sensorDataGet.join();
-	processingThread.join();
 	matlabDisplay.join();
 
 	return 0;

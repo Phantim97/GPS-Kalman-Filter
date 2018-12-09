@@ -1,7 +1,7 @@
 #pragma once
 #include "State.h"
 
-const float g_measure_err = .4f; // global for measurement error
+const float g_measure_err = .04f; // global for measurement error
 
 namespace Kalman
 {

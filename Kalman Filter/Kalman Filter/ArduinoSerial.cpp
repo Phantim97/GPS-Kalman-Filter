@@ -74,7 +74,7 @@ bool Serial::ReadData(State &K)
 {
 	DWORD bytesRead;
 	unsigned int toRead = 0;
-	unsigned char buffer[384] = { 0 };
+	unsigned char buffer[388] = { 0 };
 
 	ClearCommError(this->hSerial, &this->errors, &this->status);
 
@@ -84,7 +84,7 @@ bool Serial::ReadData(State &K)
 		unsigned char bytes[4];
 	} u;
 
-	float sensorReadings[12]; //sensordata
+	float sensorReadings[13]; //sensordata
 
 	while (1)
 	{
@@ -98,7 +98,7 @@ bool Serial::ReadData(State &K)
 			{
 				ReadFile(this->hSerial, buffer, 4, &bytesRead, NULL);
 				toRead += 4;
-				if (toRead > 384)
+				if (toRead > 388)
 				{
 					std::cout << "BAD READ!\n";
 					return false;
@@ -128,14 +128,14 @@ bool Serial::ReadData(State &K)
 				}
 				for (int i = 0; i < sizeof(sensorReadings) / sizeof(float); i++)
 				{
-					if (sensorReadings[i] > 1000 || sensorReadings[i] < -1000)
+					if (sensorReadings[i] > 100000 || sensorReadings[i] < -100000)
 					{
 						std::cout << "BAD ELEMENT READ!\n";
 						return false;
 					}
 				}
 				K.dataSet(sensorReadings);
-				K.m_time = (float)time(0); // set current time
+				//K.m_time = time(0); // set current time
 				K.printDataSet();
 				std::cout << "End\n";
 				return true;
