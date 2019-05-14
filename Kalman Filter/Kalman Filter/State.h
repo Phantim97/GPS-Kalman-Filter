@@ -20,7 +20,7 @@ public:
 	State();
 	~State();
 	State& operator=(State &&other);
-	void dataSet(float sensorData[12]); // Arduino data -> object
+	void dataSet(float sensorData[13]); // Arduino data -> object
 	void printDataSet();
 	float getSat();
 };
